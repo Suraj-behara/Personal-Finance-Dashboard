@@ -1,0 +1,313 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Personal Finance Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#eef2ff;
+      --card:#ffffff;
+      --accent:#4f46e5;
+      --accent-light:#6366f1;
+      --success:#16a34a;
+      --danger:#dc2626;
+      --text:#0f172a;
+      --muted:#6b7280;
+      --shadow:0 8px 20px rgba(15,23,42,0.08);
+      --radius:18px;
+      --transition:0.3s ease;
+    }*{box-sizing:border-box;margin:0;padding:0;font-family:'Poppins',sans-serif;}
+body{
+  background:linear-gradient(135deg,#dbeafe,#eef2ff,#e0e7ff);
+  min-height:100vh;
+  color:var(--text);
+}
+
+.container{
+  max-width:1200px;
+  margin:auto;
+  padding:20px;
+}
+
+header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:20px;
+  padding:10px 0;
+}
+
+header h1{
+  font-weight:600;
+  font-size:1.6rem;
+  color:var(--accent);
+  text-shadow:0 2px 4px rgba(79,70,229,0.2);
+}
+
+button{
+  background:var(--accent);
+  color:#fff;
+  border:none;
+  padding:10px 14px;
+  border-radius:var(--radius);
+  cursor:pointer;
+  transition:var(--transition);
+}
+
+button:hover{
+  background:var(--accent-light);
+  transform:translateY(-2px);
+}
+
+.dashboard-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
+  gap:20px;
+}
+
+.card{
+  background:var(--card);
+  border-radius:var(--radius);
+  padding:20px;
+  box-shadow:var(--shadow);
+  transition:var(--transition);
+}
+
+.card:hover{
+  transform:translateY(-5px);
+}
+
+.summary-cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:15px;
+  margin-bottom:20px;
+}
+
+.summary-cards .card h3{
+  font-size:0.9rem;
+  color:var(--muted);
+  margin-bottom:6px;
+}
+
+.summary-cards .amount{
+  font-size:1.4rem;
+  font-weight:600;
+}
+
+.positive{color:var(--success)}
+.negative{color:var(--danger)}
+
+form label{
+  display:block;
+  margin-bottom:10px;
+  font-weight:500;
+}
+
+input,select{
+  width:100%;
+  padding:10px;
+  margin-top:4px;
+  border:1px solid #d1d5db;
+  border-radius:10px;
+}
+
+.charts{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:20px;
+}
+
+canvas{
+  width:100%!important;
+  border-radius:var(--radius);
+  background:#f9fafb;
+  box-shadow:inset 0 0 10px rgba(0,0,0,0.03);
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+
+th,td{
+  text-align:left;
+  padding:10px;
+  border-bottom:1px solid #e5e7eb;
+}
+
+th{background:#f9fafb;}
+
+footer{
+  text-align:center;
+  margin-top:20px;
+  font-size:0.85rem;
+  color:var(--muted);
+}
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>💰 Personal Finance Dashboard</h1>
+      <button onclick="resetDashboard()">Reset Data</button>
+    </header><section class="summary-cards">
+  <div class="card"><h3>Total Balance</h3><div class="amount" id="balance">₹0</div></div>
+  <div class="card"><h3>Income</h3><div class="amount positive" id="income">₹0</div></div>
+  <div class="card"><h3>Expenses</h3><div class="amount negative" id="expense">₹0</div></div>
+  <div class="card"><h3>Investments</h3><div class="amount" id="investments">₹0</div></div>
+</section>
+
+<div class="dashboard-grid">
+  <div class="card">
+    <h2>Add Transaction</h2>
+    <form id="transactionForm">
+      <label>Title<input type="text" id="title" required></label>
+      <label>Amount<input type="number" id="amount" required></label>
+      <label>Type<select id="type"><option value="income">Income</option><option value="expense">Expense</option><option value="investment">Investment</option></select></label>
+      <label>Category<select id="category"><option>Food</option><option>Transport</option><option>Shopping</option><option>Salary</option><option>Utilities</option></select></label>
+      <label>Date<input type="date" id="date" required></label>
+      <button type="submit">Add</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Transactions</h2>
+    <table>
+      <thead><tr><th>Title</th><th>Category</th><th>Type</th><th>Amount</th><th>Date</th></tr></thead>
+      <tbody id="transactions"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="charts" style="margin-top:20px">
+  <div class="card"><h3>Expense Breakdown</h3><canvas id="pieChart"></canvas></div>
+  <div class="card"><h3>Monthly Trends</h3><canvas id="lineChart"></canvas></div>
+</div>
+
+<footer>✨ Designed for elegance and clarity • Data saved locally</footer>
+
+  </div> <script>
+  const form = document.getElementById('transactionForm');
+  const tbody = document.getElementById('transactions');
+  let transactions = JSON.parse(localStorage.getItem('financeData') || '[]');
+
+  function render() {
+    tbody.innerHTML = '';
+    let income = 0, expense = 0, invest = 0;
+
+    transactions.forEach(t => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${t.title}</td>
+        <td>${t.category}</td>
+        <td>${t.type}</td>
+        <td>₹${t.amount}</td>
+        <td>${t.date}</td>
+      `;
+      tbody.appendChild(tr);
+
+      if (t.type === 'income') income += Number(t.amount);
+      if (t.type === 'expense') expense += Number(t.amount);
+      if (t.type === 'investment') invest += Number(t.amount);
+    });
+
+    document.getElementById('income').textContent = `₹${income}`;
+    document.getElementById('expense').textContent = `₹${expense}`;
+    document.getElementById('investments').textContent = `₹${invest}`;
+    document.getElementById('balance').textContent = `₹${income - (expense + invest)}`;
+
+    updateCharts();
+    localStorage.setItem('financeData', JSON.stringify(transactions));
+  }
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const t = {
+      title: form.title.value,
+      amount: form.amount.value,
+      type: form.type.value,
+      category: form.category.value,
+      date: form.date.value
+    };
+    transactions.push(t);
+    render();
+    form.reset();
+  });
+
+  function resetDashboard() {
+    if (confirm('Reset all data?')) {
+      transactions = [];
+      localStorage.removeItem('financeData');
+      render();
+    }
+  }
+
+  // Charts
+  let pieChart, lineChart;
+  function updateCharts() {
+    const expenseData = {};
+    transactions
+      .filter(t => t.type === 'expense')
+      .forEach(t => {
+        expenseData[t.category] = (expenseData[t.category] || 0) + Number(t.amount);
+      });
+
+    const ctxP = document.getElementById('pieChart').getContext('2d');
+    if (pieChart) pieChart.destroy();
+    pieChart = new Chart(ctxP, {
+      type: 'pie',
+      data: {
+        labels: Object.keys(expenseData),
+        datasets: [{
+          data: Object.values(expenseData),
+          backgroundColor: ['#60a5fa', '#34d399', '#f87171', '#facc15', '#a78bfa']
+        }]
+      }
+    });
+
+    // Extract unique months from transaction data
+const allMonths = [...new Set(
+  transactions.map(t => 
+    new Date(t.date).toLocaleString('default', { month: 'short' })
+  )
+)].sort((a, b) => 
+  new Date(Date.parse(a + " 1, 2024")) - new Date(Date.parse(b + " 1, 2024"))
+);
+
+// Calculate expense totals for each month
+const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const expVals = monthNames.map(m =>
+  transactions
+    .filter(t => t.type === 'expense' && new Date(t.date).toLocaleString('default', { month: 'short' }) === m)
+    .reduce((a, b) => a + Number(b.amount), 0)
+);
+
+const ctxL = document.getElementById('lineChart').getContext('2d');
+if (lineChart) lineChart.destroy();
+lineChart = new Chart(ctxL, {
+  type: 'line',
+  data: {
+    labels: monthNames,
+    datasets: [{
+      label: 'Expenses',
+      data: expVals,
+      borderColor: '#4f46e5',
+      fill: true,
+      backgroundColor: 'rgba(79,70,229,0.1)',
+      tension: 0.3
+    }]
+  }
+});
+
+  }
+
+  render();
+</script>
+</body>
+</html>
