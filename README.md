@@ -16,12 +16,13 @@ Key Features
 
 🧭 Responsive Design – works seamlessly on desktop and mobile
 
----- Tech Stack----
+---- Tech Stack ----
 
 Frontend: HTML, CSS, JavaScript
 
 Charts: Chart.js
 
 Storage: Browser LocalStorage
+--- Visual Representation ---
 <img width="1863" height="877" alt="image" src="https://github.com/user-attachments/assets/2ba5ea7c-7ace-4c0a-bbae-0a585d42a528" />
 
