@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Personal Finance Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --bg:#f6f8fb; --card:#ffffff; --muted:#6b7280; --accent:#0ea5a4; --accent-2:#2563eb; --success:#10b981;
+      --danger:#ef4444; --glass:rgba(255,255,255,0.6); --radius:14px; --gap:14px; --shadow:0 6px 18px rgba(15,23,42,0.08);
+      --min-touch:44px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial; background:linear-gradient(180deg,#eef2ff, var(--bg)); color:#0f172a; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+    .wrap{max-width:1100px;margin:18px auto;padding:18px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    header h1{font-size:1.2rem;margin:0}
+    .controls{display:flex;gap:8px;align-items:center}
+    button{background:var(--accent-2);color:#fff;border:0;padding:8px 12px;border-radius:10px;cursor:pointer;box-shadow:var(--shadow)}
+    /* Grid */
+    .grid{display:grid;grid-template-columns:1fr;gap:var(--gap)}
+    @media(min-width:900px){.grid{grid-template-columns:320px 1fr}}
+    /* Left column */
+    .panel{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)}
+    .summary{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .card{padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.8),var(--card));}
+    .card h3{margin:0;font-size:0.85rem;color:var(--muted)}
+    .amount{font-size:1.1rem;font-weight:700;margin-top:6px}
+    .positive{color:var(--success)}
+    .negative{color:var(--danger)}
+
+    form .row{display:flex;gap:8px;margin-top:10px}
+    label{font-size:0.75rem;color:var(--muted)}
+    input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef8;background:transparent}
+    input[type=number]{-moz-appearance:textfield}
+    .submit{margin-top:10px}
+
+    /* Right column */
+    .transactions{display:flex;flex-direction:column;gap:10px}
+    .filters{display:flex;gap:8px;align-items:center}
+    .table{overflow:auto;border-radius:10px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;text-align:left;border-bottom:1px solid #f1f5f9;font-size:0.9rem}
+    .tag{padding:6px 8px;border-radius:999px;font-size:0.75rem;background:#eef2ff;color:var(--accent-2);display:inline-block}
+    .empty{padding:18px;text-align:center;color:var(--muted)}
+
+    /* Charts Row */
+    .charts{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:900px){.charts{grid-template-columns:1fr 1fr}}
+    .chart-card{padding:12px;border-radius:12px;background:var(--card);box-shadow:var(--shadow)}
+
+    footer{margin-top:12px;text-align:center;color:var(--muted);font-size:0.85rem}
+    .btn-icon{min-height:var(--min-touch);min-width:var(--min-touch);display:inline-flex;align-items:center;justify-content:center}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Personal Finance Dashboard</h1>
+      <div class="controls">
+        <button id="clearAll" class="btn-icon" title="Clear all data">Clear</button>
+        <button id="exportBtn">Export</button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:0.9rem;color:var(--muted)">Total Balance</div>
+            <div class="amount" id="totalBalance">₹0</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:0.75rem;color:var(--muted)">Monthly Savings</div>
+            <div class="amount positive" id="monthlySavings">₹0</div>
+          </div>
+        </div>
+
+        <div class="summary" style="margin-top:12px">
+          <div class="card">
+            <h3>Income (month)</h3>
+            <div class="amount" id="incomeMonth">₹0</div>
+          </div>
+          <div class="card">
+            <h3>Expenses (month)</h3>
+            <div class="amount negative" id="expenseMonth">₹0</div>
+          </div>
+          <div class="card">
+            <h3>Investment</h3>
+            <div class="amount" id="investmentTotal">₹0</div>
+          </div>
+          <div class="card">
+            <h3>Transactions</h3>
+            <div class="amount" id="txnCount">0</div>
+          </div>
+        </div>
+
+        <form id="txnForm" aria-label="Add transaction">
+          <label>Title<input id="title" required placeholder="eg. Grocery, Salary"></label>
+          <div class="row">
+            <label>Amount<input id="amount" type="number" step="0.01" required placeholder="e.g. 350"></label>
+            <label>Type<select id="type">
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+              <option value="investment">Investment</option>
+            </select></label>
+          </div>
+          <div class="row">
+            <label>Category<select id="category">
+              <option>Food</option><option>Transport</option><option>Shopping</option><option>Salary</option><option>Rent</option><option>Utilities</option><option>Other</option>
+            </select></label>
+            <label>Date<input id="date" type="date" required></label>
+          </div>
+          <button class="submit" id="addTxn">Add Transaction</button>
+        </form>
+
+      </section>
+
+      <section class="panel transactions">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2 style="margin:0;font-size:1rem">Transactions</h2>
+          <div class="filters">
+            <select id="filterCategory"><option value="all">All categories</option></select>
+            <select id="filterType"><option value="all">All types</option><option value="income">Income</option><option value="expense">Expense</option><option value="investment">Investment</option></select>
+            <input id="search" placeholder="Search" style="padding:8px;border-radius:8px;border:1px solid #e6eef8;" />
+          </div>
+        </div>
+
+        <div class="table" id="tableWrap">
+          <table id="txnTable">
+            <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Type</th><th>Amount</th><th>Action</th></tr></thead>
+            <tbody id="txnTbody"></tbody>
+          </table>
+        </div>
+
+        <div class="charts" style="margin-top:12px">
+          <div class="chart-card">
+            <h3 style="margin:0 0 8px 0;font-size:0.95rem">Expense Breakdown</h3>
+            <canvas id="pieChart" height="200"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3 style="margin:0 0 8px 0;font-size:0.95rem">Monthly Spending Trend</h3>
+            <canvas id="lineChart" height="200"></canvas>
+          </div>
+          <div class="chart-card" style="grid-column:1 / -1">
+            <h3 style="margin:0 0 8px 0;font-size:0.95rem">Income vs Expenses (last 6 months)</h3>
+            <canvas id="barChart" height="160"></canvas>
+          </div>
+        </div>
+
+      </section>
+    </main>
+
+    <footer>Built with ❤ — LocalStorage powered • Mobile-first</footer>
+  </div>
+
+  <script>
+document.addEventListener('DOMContentLoaded', () => {
+  const qs = s => document.querySelector(s);
+  const LS_KEY = 'pf_dashboard_v1';
+
+  // --- Elements ---
+  const totalBalanceEl = qs('#totalBalance');
+  const incomeMonthEl = qs('#incomeMonth');
+  const expenseMonthEl = qs('#expenseMonth');
+  const investmentTotalEl = qs('#investmentTotal');
+  const txnCountEl = qs('#txnCount');
+  const monthlySavingsEl = qs('#monthlySavings');
+  const txnForm = qs('#txnForm');
+  const titleIn = qs('#title');
+  const amountIn = qs('#amount');
+  const typeIn = qs('#type');
+  const categoryIn = qs('#category');
+  const dateIn = qs('#date');
+  const filterCategory = qs('#filterCategory');
+  const filterType = qs('#filterType');
+  const searchIn = qs('#search');
+  const txnTbody = qs('#txnTbody');
+  const clearAllBtn = qs('#clearAll');
+  const exportBtn = qs('#exportBtn');
+
+  // --- Data ---
+  let transactions = [];
+
+  if(!dateIn.value){ dateIn.value = new Date().toISOString().slice(0,10); }
+
+  function load(){
+    const raw = localStorage.getItem(LS_KEY);
+    transactions = raw ? JSON.parse(raw) : [];
+    if(!transactions.length) transactions = getSampleData();
+  }
+  function save(){ localStorage.setItem(LS_KEY, JSON.stringify(transactions)); }
+
+  function getSampleData(){
+    return [
+      {id:uid(),title:'Salary',amount:50000,type:'income',category:'Salary',date:recentDate(0)},
+      {id:uid(),title:'Groceries',amount:2500,type:'expense',category:'Food',date:recentDate(2)},
+      {id:uid(),title:'Electricity',amount:1200,type:'expense',category:'Utilities',date:recentDate(5)},
+      {id:uid(),title:'Mutual Fund',amount:3000,type:'investment',category:'Investment',date:recentDate(10)},
+      {id:uid(),title:'Uber',amount:350,type:'expense',category:'Transport',date:recentDate(9)}
+    ];
+  }
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function recentDate(daysAgo){ const d=new Date(); d.setDate(d.getDate()-daysAgo); return d.toISOString().slice(0,10); }
+
+  // --- Rendering & Summary ---
+  function updateSummary(){
+  const now = new Date();
+  const month = now.getMonth();
+  const year = now.getFullYear();
+
+  let totalBalance = 0;
+  let incomeMonth = 0;
+  let expenseMonth = 0;
+  let investTotal = 0;
+
+  transactions.forEach(t => {
+    const amt = Number(t.amount);
+    const tDate = new Date(t.date);
+    const isThisMonth = tDate.getMonth() === month && tDate.getFullYear() === year;
+
+    if (t.type === 'income') {
+      totalBalance += amt; // add to balance
+      if (isThisMonth) incomeMonth += amt;
+    }
+    else if (t.type === 'expense') {
+      totalBalance -= amt; // subtract from balance
+      if (isThisMonth) expenseMonth += amt;
+    }
+    else if (t.type === 'investment') {
+      totalBalance -= amt; // exclude from income, but reduce available balance
+      if (isThisMonth) investTotal += amt;
+    }
+  });
+
+  animateNumber(totalBalanceEl, totalBalance);
+  animateNumber(incomeMonthEl, incomeMonth);
+  animateNumber(expenseMonthEl, expenseMonth);
+  animateNumber(investmentTotalEl, investTotal);
+  animateNumber(txnCountEl, transactions.length);
+
+  // monthly savings = income - (expense + investment)
+  const monthlySavings = Math.max(0, incomeMonth - (expenseMonth + investTotal));
+  animateNumber(monthlySavingsEl, monthlySavings);
+}
+
+
+  function animateNumber(el, value){
+    const start = Number(el.dataset._val) || 0;
+    const end = Math.round(value);
+    el.dataset._val = end;
+    const duration = 550;
+    const startTime = performance.now();
+    function step(now){
+      const t = Math.min(1,(now-startTime)/duration);
+      const cur = Math.round(start + (end-start)*easeOutCubic(t));
+      el.textContent = formatCurrency(cur);
+      if(t<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function easeOutCubic(t){return 1 - Math.pow(1-t,3);}
+  function formatCurrency(x){return '₹' + Number(x).toLocaleString('en-IN');}
+
+  function escapeHtml(s){ return (s+'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;" })[c]); }
+  function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function renderTable(){
+    txnTbody.innerHTML='';
+    const q = searchIn.value.trim().toLowerCase();
+    const catFilter = filterCategory.value;
+    const typeFilter = filterType.value;
+    const list = transactions.slice().sort((a,b)=> new Date(b.date)-new Date(a.date))
+      .filter(t=> (catFilter==='all' || t.category===catFilter) && (typeFilter==='all' || t.type===typeFilter) && (q==='' || t.title.toLowerCase().includes(q) || t.category.toLowerCase().includes(q)));
+    if(list.length===0){ txnTbody.innerHTML='<tr><td class="empty" colspan="6">No transactions found</td></tr>'; return; }
+    list.forEach(t=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML = `<td>${t.date}</td>
+        <td>${escapeHtml(t.title)}</td>
+        <td><span class="tag">${escapeHtml(t.category)}</span></td>
+        <td>${escapeHtml(cap(t.type))}</td>
+        <td>${t.type==='expense' ? '- ' : ''}${formatCurrency(t.amount)}</td>
+        <td><button data-id="${t.id}" class="del">Delete</button></td>`;
+      txnTbody.appendChild(tr);
+    });
+  }
+
+  // --- Charts ---
+  let pieChart, lineChart, barChart;
+  function initCharts(){
+    const pieCtx = qs('#pieChart').getContext('2d');
+    const lineCtx = qs('#lineChart').getContext('2d');
+    const barCtx = qs('#barChart').getContext('2d');
+
+    pieChart = new Chart(pieCtx,{ type:'pie', data:{labels:[],datasets:[{label:'Expenses',data:[],backgroundColor:[]}]}, options:{plugins:{legend:{position:'bottom'}}}});
+    lineChart = new Chart(lineCtx,{ type:'line', data:{labels:[],datasets:[{label:'Spending',data:[],fill:true,tension:0.3,backgroundColor:'rgba(37,99,235,0.2)',borderColor:'#2563eb'}]}, options:{scales:{y:{beginAtZero:true}},plugins:{legend:{display:false}}}});
+    barChart = new Chart(barCtx,{ type:'bar', data:{labels:[],datasets:[{label:'Income',data:[],backgroundColor:'#10b981'},{label:'Expenses',data:[],backgroundColor:'#ef4444'}]}, options:{scales:{y:{beginAtZero:true}}}});
+    updateCharts();
+  }
+
+  function updateCharts(){
+    console.log("✅ updateCharts triggered", transactions.length);
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+
+    // --- Pie ---
+    const expenseByCat = {};
+    transactions.forEach(t=>{
+      if(t.type==='expense' && new Date(t.date).getMonth()===month && new Date(t.date).getFullYear()===year){
+        expenseByCat[t.category] = (expenseByCat[t.category]||0) + Number(t.amount);
+      }
+    });
+    const pieLabels = Object.keys(expenseByCat);
+    const pieData = pieLabels.map(l=>expenseByCat[l]);
+    const pieColors = pieLabels.map((_, i) => {
+      const hue = (i * 60 + Math.random() * 30) % 360;
+      return `hsl(${hue}, 70%, 70%)`;
+    });
+    pieChart.data.labels = pieLabels;
+    pieChart.data.datasets[0].data = pieData;
+    pieChart.data.datasets[0].backgroundColor = pieColors;
+    pieChart.update();
+
+    // --- Line ---
+    const last6 = [];
+    for(let i=5;i>=0;i--){
+      const d = new Date(); d.setMonth(d.getMonth()-i);
+      last6.push({m:d.getMonth(),y:d.getFullYear(),label: d.toLocaleString('default',{month:'short'})});
+    }
+    const lineData = last6.map(l=>
+      transactions.filter(t=>t.type==='expense' && new Date(t.date).getMonth()===l.m && new Date(t.date).getFullYear()===l.y)
+        .reduce((s,t)=>s+Number(t.amount),0)
+    );
+    lineChart.data.labels = last6.map(l=>l.label);
+    lineChart.data.datasets[0].data = lineData;
+    lineChart.update();
+
+    // --- Bar ---
+    const incomeData = last6.map(l=>
+      transactions.filter(t=>t.type==='income' && new Date(t.date).getMonth()===l.m && new Date(t.date).getFullYear()===l.y)
+        .reduce((s,t)=>s+Number(t.amount),0)
+    );
+    const expenseData = last6.map(l=>
+      transactions.filter(t=>t.type==='expense' && new Date(t.date).getMonth()===l.m && new Date(t.date).getFullYear()===l.y)
+        .reduce((s,t)=>s+Number(t.amount),0)
+    );
+    barChart.data.labels = last6.map(l=>l.label);
+    barChart.data.datasets[0].data = incomeData;
+    barChart.data.datasets[1].data = expenseData;
+    barChart.update();
+  }
+
+  // --- Events ---
+  txnForm.addEventListener('submit', e=>{
+    e.preventDefault();
+    const t = {
+      id: uid(),
+      title: titleIn.value.trim(),
+      amount: Number(amountIn.value),
+      type: typeIn.value,
+      category: categoryIn.value,
+      date: dateIn.value
+    };
+    transactions.push(t);
+    save();
+    renderTable();
+    updateSummary();
+    updateCharts();
+    txnForm.reset();
+    dateIn.value = new Date().toISOString().slice(0,10);
+  });
+
+  txnTbody.addEventListener('click', e=>{
+    if(e.target.classList.contains('del')){
+      const id = e.target.dataset.id;
+      transactions = transactions.filter(t=>t.id!==id);
+      save();
+      renderTable();
+      updateSummary();
+      updateCharts();
+    }
+  });
+
+  clearAllBtn.addEventListener('click', ()=>{
+    if(confirm('Clear all transactions?')){
+      transactions = [];
+      save();
+      renderTable();
+      updateSummary();
+      updateCharts();
+    }
+  });
+
+  searchIn.addEventListener('input', ()=> renderTable());
+  filterCategory.addEventListener('change', ()=> renderTable());
+  filterType.addEventListener('change', ()=> renderTable());
+
+  // --- Initial Load ---
+  load();
+  renderTable();
+  updateSummary();
+  initCharts();
+});
+</script>
+</body>
+</html>
